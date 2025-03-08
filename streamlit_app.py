@@ -1,49 +1,46 @@
 import streamlit as st
-from openai import OpenAI
+import openai
 
-# Initialize OpenAI client using Streamlit's secrets
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+def get_response(messages):
+    """Send chat history and user message to OpenAI and get a response with a food recipe focus."""
+    client = openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+    
+    # Ensure the system message is always included
+    if messages[0]["role"] != "system":
+        messages.insert(0, {"role": "system", "content": "You are a helpful chef assistant. You only respond with food recipes, ingredients, and cooking instructions."})
 
-# Title of the app
-st.title("MyBuddyChat")
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=messages
+    )
+    return response.choices[0].message.content
 
-# Initialize session state for chat history
+# Set Streamlit app title
+st.title("MeFoodie - Recipe Assistant")
+
+# Initialize chat history in session state if not already present
 if "messages" not in st.session_state:
-    st.session_state.messages = []
+    st.session_state.messages = [{"role": "system", "content": "You are a helpful chef assistant. You only respond with food recipes, ingredients, and cooking instructions."}]
 
 # Display chat history
 for message in st.session_state.messages:
-    role, content = message["role"], message["content"]
-    with st.chat_message(role):
-        st.markdown(content)
+    if message["role"] != "system":  # Hide system message in chat UI
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
 
-# Collect user input for symptoms
-user_input = st.chat_input("How can I help you...")
+# User input
+user_input = st.chat_input("Ask for a recipe...")
 
-# Function to get a response from OpenAI with health advice
-def get_response(prompt):
-    # Here, you may include a more specific prompt or fine-tune the assistant's instructions to provide general remedies
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": m["role"], "content": m["content"]}
-            for m in st.session_state.messages
-        ] + [{"role": "user", "content": prompt}]
-    )
-    # Access the content directly as an attribute
-    return response.choices[0].message.content
-
-# Process and display response if there's input
 if user_input:
-    # Append user's message
+    # Append user message to session state and display it
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.markdown(user_input)
 
-    # Generate assistant's response
-    assistant_prompt = f"User has reported the following: {user_input}. Provide an assistance."
-    assistant_response = get_response(assistant_prompt)
+    # Get assistant response (focused on food recipes)
+    assistant_response = get_response(st.session_state.messages)
+
+    # Append assistant message to session state and display it
     st.session_state.messages.append({"role": "assistant", "content": assistant_response})
-    
     with st.chat_message("assistant"):
         st.markdown(assistant_response)
